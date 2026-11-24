@@ -13,7 +13,7 @@ import qs.Ui
 // the viewer's PRs and review requests, and the contribution graph.
 //
 // Data: local.sh (git only, polled), remote.sh (one gh GraphQL call, polled
-// slowly), action.sh (stage/commit/push/pull/fetch/lazygit). IPC: omarchy-shell mulm.github toggle
+// slowly), action.sh (stage/stage-file/commit/push/pull/fetch/lazygit). IPC: omarchy-shell mulm.github toggle
 Panel {
   id: root
   moduleName: "mulm.github"
@@ -212,15 +212,17 @@ Panel {
   // ---------- actions ----------
   function isPending(kind, repo) { return repo && pendingAction === kind + ":" + repo.path }
 
-  function runAction(kind, repo, message) {
+  function runAction(kind, repo, argument) {
     if (!repo || actionProc.running) return
-    if (kind === "commit" && (!repo.staged || repo.conflicts || !message)) return
+    if (kind === "commit" && (!repo.staged || repo.conflicts || !argument)) return
     if (kind === "push" && !(repo.ahead > 0 && repo.remote !== "")) return
     if (kind === "pull" && !(repo.behind > 0)) return
+    if (kind === "stage-file" && (repo.conflicts || !argument || !argument.length)) return
     pendingAction = kind + ":" + repo.path
-    actionProc.command = kind === "commit"
-      ? [pluginDir + "/action.sh", kind, repo.path, message]
-      : [pluginDir + "/action.sh", kind, repo.path]
+    var command = [pluginDir + "/action.sh", kind, repo.path]
+    if (kind === "commit") command.push(argument)
+    if (kind === "stage-file") command = command.concat(argument)
+    actionProc.command = command
     actionProc.running = true
   }
 
@@ -917,15 +919,35 @@ Panel {
       Repeater {
         model: rowRoot.expanded ? (rowRoot.repo.files || []) : []
 
-        Text {
+        Item {
+          id: fileRow
           required property var modelData
-          textFormat: Text.PlainText
           width: parent.innerWidth
-          elide: Text.ElideRight
-          text: strings.t(modelData.status).arg(modelData.path.slice(0, 1024))
-          color: root.fg
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
+          implicitHeight: Math.max(fileText.implicitHeight, stageFileButton.visible ? stageFileButton.implicitHeight : 0)
+
+          Text {
+            id: fileText
+            anchors.left: parent.left
+            anchors.right: stageFileButton.visible ? stageFileButton.left : parent.right
+            anchors.rightMargin: stageFileButton.visible ? Style.space(6) : 0
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            elide: Text.ElideRight
+            text: strings.t(fileRow.modelData.status).arg(fileRow.modelData.path.slice(0, 1024))
+            color: root.fg
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          LinkButton {
+            id: stageFileButton
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            text: strings.t("stageFile")
+            visible: !!(fileRow.modelData.stagePaths || []).length
+            enabled: !actionProc.running && rowRoot.repo.conflicts === 0
+            onClicked: root.runAction("stage-file", rowRoot.repo, fileRow.modelData.stagePaths)
+          }
         }
       }
 

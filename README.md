@@ -13,7 +13,7 @@ An [Omarchy](https://omarchy.org) bar widget that shows your local repos and you
 Click the icon, or run `omarchy-shell mulm.github toggle`.
 
 - **Repos**: the most recently committed ones. Repos with unpushed or unpulled commits are always listed.
-  - Each shows its recent commit history and CI state.
+  - Each shows its recent commit history and CI state. Expand a repo to review changed files, click **Stage** beside a file or **Stage all**, and commit the staged changes.
   - Actions: **push**, **pull** (`--ff-only`), **fetch**, open in **lazygit**. Results arrive as notifications.
 - **Pull requests**: your open PRs and PRs waiting for your review.
 - **Notifications** and your **contribution graph**.

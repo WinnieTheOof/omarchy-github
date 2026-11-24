@@ -23,7 +23,7 @@ done
 
 for repo in "${repos[@]}"; do
   mapfile -t status < <(
-    git -C "$repo" status --porcelain=v2 --branch --show-stash --untracked-files=all 2>/dev/null | awk -v OFS="$US" '
+    git -C "$repo" -c core.quotePath=true status --porcelain=v2 --branch --show-stash --untracked-files=all 2>/dev/null | awk -v OFS="$US" '
       /^# branch.head /     { head = $3 }
       /^# branch.upstream / { up = $3 }
       /^# branch.ab /       { a = substr($3, 2); b = substr($4, 2) }
@@ -32,8 +32,12 @@ for repo in "${repos[@]}"; do
         path = $0
         fields = $1 == "1" ? 8 : ($1 == "2" ? 9 : ($1 == "u" ? 10 : 1))
         for (i = 0; i < fields; i++) sub(/^[^ ]+ /, "", path)
+        stagePath = path
+        stageSource = ""
         if ($1 == "2") {
           split(path, rename, "\t")
+          stagePath = rename[1]
+          if (substr($2, 2, 1) == "R") stageSource = rename[2]
           path = rename[2] " → " rename[1]
         }
         # Keep filenames on one display line. Git already quotes control characters.
@@ -46,8 +50,14 @@ for repo in "${repos[@]}"; do
           m += worktreeChanged
           label = indexChanged ? (worktreeChanged ? "Staged + unstaged" : "Staged") : "Unstaged"
         }
+        stagePaths = ""
+        if (label == "Untracked" || label == "Unstaged" || label == "Staged + unstaged") {
+          # Git add --pathspec-from-file accepts the quoted paths emitted by status.
+          stagePaths = OFS stagePath
+          if (stageSource != "") stagePaths = stagePaths OFS stageSource
+        }
         group = label ~ /^Staged/ ? 1 : 2
-        if (++count[group] <= 200) files[group, count[group]] = label OFS path
+        if (++count[group] <= 200) files[group, count[group]] = label OFS path stagePaths
       }
       END {
         print head, up, a + 0, b + 0, s + 0, m + 0, u + 0, c + 0, st + 0, count[1] + count[2]
@@ -93,7 +103,7 @@ done | jq -R -s -c '
           fetchedAt: ($f[14] | tonumber), fileCount: ($f[15] | tonumber), files: [], commits: []
         }]
       elif $f[0] == "F" and length > 0 then
-        .[-1].files += [{ status: $f[1], path: $f[2] }]
+        .[-1].files += [{ status: $f[1], path: $f[2], stagePaths: $f[3:] }]
       elif $f[0] == "C" and length > 0 then
         .[-1].commits += [{ hash: $f[1], time: ($f[2] | tonumber), author: $f[3], subject: ($f[4:] | join("\u001f")) }]
       else . end)
