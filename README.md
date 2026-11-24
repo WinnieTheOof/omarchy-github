@@ -1,5 +1,7 @@
 # GitHub for Omarchy
 
+Forked from [mulmlord’s GitHub for Omarchy](https://github.com/mulmlord/omarchy-github).
+
 An [Omarchy](https://omarchy.org) bar widget that shows your local repos and your GitHub account at a glance.
 
 ## In the bar
